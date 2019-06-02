@@ -1,13 +1,13 @@
 YARC: Yet Another Roomba Controller
 ===================================
 
-This is a Python library that allows you to control Roomba's and Create's from iRobot using the serial connection. This requires Python 3 and the pyserial library. This can run on many devices such as Raspberry Pis and regular PCs.
+This is a Python library that allows you to control Roomba's and Create's from iRobot using the serial connection. This requires Python 3 and the pyserial library. This can run on many devices such as Raspberry Pis and regular PCs. Tested on the Create 2, some older devices may not support all operations or sensors.
 
 This implements the Open Interface specification by iRobot: http://www.irobot.com/~/media/MainSite/PDFs/About/STEM/Create/create_2_Open_Interface_Spec.pdf
 
-This library implements every single opcode in the specification and provides every single sensor in an easy-to-use system.
+This library implements every single opcode in the specification and provides every sensor in an easy-to-use system. All single sensors are available as attributes on a `yarc.Roomba` object along with `all_sensors` which is a `namedtuple` of all of the sensors. Other groups can be obtained with the `sensor()` method and custom groups can be acquired with `query_list()` method. Single values are returned as `int`s or `bool`s, bit fields are returned as `IntFlag` types, and collections of values are returned as `namedtuple` instances.
 
-This can be installed from source from the Github page or through pip.
+This can be installed from source from the Github source or through pip: `pip install yarc`.
 
 
 Example
