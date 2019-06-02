@@ -123,6 +123,21 @@ class Roomba(object):
         Changes mode to: off, beeps
         """
         self.serial.write(OpCode.STOP)
+    def wake(self):
+        """
+        Wake up robot. This is useful in at least two different cases:
+         * After being taken off of the charger this needs to be called once to use the Roomb again
+         * Called at least once per 5 min while in passive mode to keep the Rooma awake
+        Some serial/usb cables are wired wrong so this doesn't work, but recent cables are fine.
+
+        This blocks for 0.3 seconds.
+        """
+        self.serial.rts = False
+        self.serial.dtr = False
+        time.sleep(0.15)
+        self.serial.rts = True
+        self.serial.dtr = True
+        time.sleep(0.15)
 
     @property
     def baud(self): return self.serial.baudrate
@@ -506,8 +521,8 @@ class Roomba(object):
         """
         sensor = Roomba.__get_sensor(sensor)
         data = struct.pack('B', sensor.packet_id)
-        self.serial.reset_input_buffer()
         self.serial.write(OpCode.SENSORS + data)
+        self.serial.reset_input_buffer()
         wait = self.__required_time(sensor.size) - 0.0005
         if wait > 0: time.sleep(wait)
         return sensor.parse(self.serial.read(sensor.size))
@@ -522,8 +537,8 @@ class Roomba(object):
         if n < 1 or n > 255: raise ValueError('invalid number of sensors')
         sensors = [Roomba.__get_sensor(sensor) for sensor in sensors]
         data = struct.pack(str(n+1) + 'B', n, *[sensor.packet_id for sensor in sensors])
-        self.serial.reset_input_buffer()
         self.serial.write(OpCode.QUERY_LIST + data)
+        self.serial.reset_input_buffer()
         datatype, size, struct_format = Sensor.summarize_group(sensors)
         wait = self.__required_time(size) - 0.001
         if wait > 0: time.sleep(wait)
@@ -547,8 +562,8 @@ class Roomba(object):
         if size+n+3 > 15/10*self.serial.baudrate: raise ValueError('requesting too much data to stream')
         
         # Start the stream
-        self.serial.reset_input_buffer()
         self.serial.write(OpCode.STREAM + data)
+        self.serial.reset_input_buffer()
         self.__stream_read(callback)
     def __stream_read(self, callback):
         # Keep reading data from the stream until the callback returns False
