@@ -2,16 +2,16 @@
 This file is part of YARC (https://github.com/coderforlife/yarc).
 Copyright (c) 2019 Jeffrey Bush.
 
-This program is free software: you can redistribute it and/or modify  
-it under the terms of the GNU General Public License as published by  
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
 the Free Software Foundation, version 3.
 
-This program is distributed in the hope that it will be useful, but 
-WITHOUT ANY WARRANTY; without even the implied warranty of 
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
 General Public License for more details.
 
-You should have received a copy of the GNU General Public License 
+You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 """
 
@@ -26,8 +26,20 @@ from .enums import (
     LightBumper, Statis
 )
 
+# pylint: disable=bad-whitespace
+
 @unique
 class Sensor(Enum):
+    """
+    Enumeration of possible sensors that can be read from the Roomba. The value of each is the
+    packet-id Each value also has the following attributes:
+      * `packet_id` - same as the value
+      * `dataypte` - the information about how to read the data, a format string, an `Enum` class,
+        or a `namedtuple` type
+      * `size` - number of bytes to be read for this sensor
+      * `struct_format` - the `struct.unpack` format string to be used for this sensor
+    A few useful methods are available as well.
+    """
     BUMPS_AND_WHEEL_DROPS       = ( 7, BumpAndWheelDrops)
     WALL                        = ( 8, '?') # deprecated, use LIGHT_BUMPER instead
     CLIFF_LEFT                  = ( 9, '?')
@@ -93,10 +105,10 @@ class Sensor(Enum):
     GROUP_43_58 = (101, list(range(43, 59)))
     GROUP_46_51 = (106, list(range(46, 52)))
     GROUP_54_58 = (107, list(range(54, 59)))
-    
+
     def __new__(cls, packet_id, datatype):
         obj = object.__new__(cls)
-        obj._value_ = packet_id
+        obj._value_ = packet_id # pylint: disable=protected-access
         obj.packet_id = packet_id
         obj.datatype = datatype
         if isinstance(obj.datatype, str):
@@ -109,39 +121,69 @@ class Sensor(Enum):
         #elif isinstance(obj.datatype, list): ...
         return obj
 
-    def __int__(self): return ord(self.value)
+    def __int__(self):
+        return ord(self.value)
 
     def parse(self, raw):
+        """
+        Convert a raw `byte` string of data for this sensor to the appropriate value, either an
+        `int`, `bool`, one of the `IntEnum` or `IntFlag` objects from `enums`, or a `namedtuple` of
+        values for multiple values.
+        """
         return self.convert(struct.unpack(self.struct_format, raw))
+
+    def convert(self, data):
+        """
+        Convert a sequence of values from the output of `struct.unpack()` or similar to the
+        appropriate value. This is the same as `parse` except the argument is a sequence and not a
+        `byte` string.
+        """
+        if isinstance(self.datatype, str):
+            if isinstance(data, Sequence) and len(data) == 1:
+                data = data[0]
+            return data
+        if isinstance(self.datatype, EnumMeta):
+            if isinstance(data, Sequence):
+                if len(data) != 1:
+                    raise ValueError()
+                data = data[0]
+            return self.datatype(data)
+        if issubclass(self.datatype, tuple):
+            # pylint: disable=no-member
+            return self.datatype._make(Sensor.convert_list(self.sensors, data))
+        raise TypeError()
 
     @staticmethod
     def convert_list(sensors, data):
-        return [s.convert(x) for s,x in
+        """
+        Take a list of sensors and a list of data values and call each sensor's `convert()` method
+        with the correct data. Any sensor that is just filler (i.e. has the format 'x') then it
+        will be skipped.
+        """
+        return [s.convert(x) for s, x in
                 zip((s for s in sensors if 'x' not in s.struct_format), data)]
-    
+
     @staticmethod
     def summarize_group(sensors, name='Group'):
-        nt = namedtuple(name, [s.name for s in sensors if s.name[0] != '_'])
-        sz = sum(s.size for s in sensors)
-        format = ('>' + ''.join(s.struct_format.strip('>') for s in sensors))
-        return nt, sz, format
+        """
+        Gets a summary of the data for a group of sensors. This returns the `namedtuple` type that
+        should be used to wrap the resulting data, the total size in bytes of all of the sensors
+        and the format string to give to `struct.unpack()` for parsing the data.
 
-    def convert(self, data):
-        if isinstance(self.datatype, str):
-            if isinstance(data, Sequence) and len(data) == 1: data = data[0]
-            return data
-        elif isinstance(self.datatype, EnumMeta):
-            if isinstance(data, Sequence):
-                if len(data) != 1: raise ValueError()
-                data = data[0]
-            return self.datatype(data)
-        elif issubclass(self.datatype, tuple):
-            return self.datatype._make(Sensor.convert_list(self.sensors, data))
+        The `namedtuple` will default to having the class name 'Group'. The second argument can
+        change this.
+        """
+        group = namedtuple(name, [s.name for s in sensors if s.name[0] != '_'])
+        size = sum(s.size for s in sensors)
+        frmt = ('>' + ''.join(s.struct_format.strip('>') for s in sensors))
+        return group, size, frmt
+
 
 # Calculate the size and struct format of the list-based sensors
 for sensor in Sensor.__members__.values():
     if isinstance(sensor.datatype, list):
         sensor.sensors = [Sensor(i) for i in sensor.datatype] # pylint: disable=no-value-for-parameter
-        sensor.datatype, sensor.size, sensor.struct_format = Sensor.summarize_group(sensor.sensors,
-                                                                    ''.join(word.capitalize() for word in sensor.name.split('_')))
-del sensor # cleanup
+        sensor.datatype, sensor.size, sensor.struct_format = \
+            Sensor.summarize_group(sensor.sensors,
+                                   ''.join(word.capitalize() for word in sensor.name.split('_')))
+del sensor # pylint: disable=undefined-loop-variable
