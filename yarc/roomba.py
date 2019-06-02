@@ -32,9 +32,8 @@ def make_sensor_property(sensor): return property(lambda self: self.sensor(senso
 
 class Roomba(object):
     # The following functions are untested:
-	#  * motors - my testing Create2 has none of these motors installed
-	#  * motors_pwm - my testing Create2 has none of these motors installed
-	#  * digit_leds_raw - isn't supported by mt testing Create2
+	#  * motors and motors_pwm - my testing Create2 has none of these motors installed
+	#  * digit_leds_raw - isn't supported by my testing Create2
 	#  * baud - default is fastest, lets just keep it that way
     # The following functions are minimally tested:
 	#  * schedule
@@ -54,7 +53,7 @@ class Roomba(object):
     def close(self):
         """
         Stop the Roomba and close the serial connection. After this method is called this object is
-        not usable.
+        not usable. This will block for 60 ms.
         """
         if not self.serial.is_open: return
         self.power() # causes all LEDs and motors to stop and the Roomba returns to passive mode
