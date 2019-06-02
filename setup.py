@@ -23,7 +23,7 @@ with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "README.md")
 
 setup(
     name='yarc',
-    version='0.9.1',
+    version='0.9.2',
     description='Yet Another Roomba Controller',
     license="GPLv3",
     long_description=long_description,
