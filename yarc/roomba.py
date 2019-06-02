@@ -79,7 +79,6 @@ class Roomba(object):
         Changes mode to: passive, beeps if coming from "off" mode.
         """
         self.serial.write(OpCode.START)
-        self.serial.reset_input_buffer()
     def reset(self, welcome_msg_bytes=6):
         """
         This command resets the robot, as if you had removed and reinserted the battery.
