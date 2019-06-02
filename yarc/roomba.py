@@ -39,29 +39,36 @@ class Roomba(object):
     # The following functions are minimally tested:
 	#  * schedule
     #  * set_day_time
-	#  * wake
 
     def __init__(self, port, baudrate=115200, timeout=0.045):
+        """
+        Connect to the Roomba on the given port (such as /dev/ttyUSB0 on Linux or COM3 on Windows).
+        This defaults to the default baudrate of Roombas (which can be changed howeevr) and has a
+        timeout of 45ms which is equivilent to 3 data cycles on the Roomba (it does things in 15ms
+        cycles). For some cirtcumstances alternative timeouts are used and cannot be adjusted.
+        """
         if baudrate not in [19200, 115200]: raise ValueError('baudrate')
         self.__default_baudrate = baudrate
         self.serial = serial.Serial(port, baudrate=baudrate, timeout=timeout)
-    def __del__(self):
-        if not self.serial.is_open: return
-        # stop motors and turn off LEDs
-        self.drive_stop()
-        self.leds()
-        self.digit_leds_ascii(b'    ')
-        time.sleep(0.03)
-
-        # close it down
-        self.close()
+    def __del__(self): self.close()
     def close(self):
+        """
+        Stop the Roomba and close the serial connection. After this method is called this object is
+        not usable.
+        """
         if not self.serial.is_open: return
-        self.power()
+        self.power() # causes all LEDs and motors to stop and the Roomba returns to passive mode
         time.sleep(0.03)
+        self.wake()
         self.stop()
         self.serial.close()
-    def read_avail(self): return self.serial.read(self.serial.in_waiting)
+    def read_avail(self):
+        """
+        Read all available bytes from the serial connection's buffer. The Roomba will peroidically
+        send messages about the firmware or battery status and this function can be used to read
+        it. Note that any sensor attribute or method will clear this buffer automatically.
+        """
+        return self.serial.read(self.serial.in_waiting)
 
     # Getting Started Commands
     def start(self):
@@ -84,7 +91,9 @@ class Roomba(object):
         booting up will be returned. This may just be the word 'Roomba'. Adjusting the argument
         welcome_msg_bytes to a higher number will attempt to read at least that many bytes from the
         welcome message. It seems as though if you want to get the firmware version you will need
-        about 160 bytes. Going to 450 is the most you will likely ever want to get.
+        about 160 bytes. Going to 450 is the most you will likely ever want to get. Additional data
+        can be obtained with the `read_avail()` method as well without blocking in this method. Any
+        additional data will be cleared if any sensor is read from.
         
         Available: always
         Changes mode to: off
@@ -106,7 +115,7 @@ class Roomba(object):
             data = self.serial.read(12)
             if data != b'Soft reset!\n': raise ValueError()
             self.serial.timeout = 1.5
-            data = self.serial.read(1, timeout=1.5)
+            data = self.serial.read(1)
             if data != b'\xfe': raise ValueError()
             self.serial.timeout = 5
             data = self.serial.read(welcome_msg_bytes)
@@ -123,21 +132,28 @@ class Roomba(object):
         Changes mode to: off, beeps
         """
         self.serial.write(OpCode.STOP)
-    def wake(self):
+    def wake(self, sleep_time=0.015, brc=None):
         """
         Wake up robot. This is useful in at least two different cases:
          * After being taken off of the charger this needs to be called once to use the Roomb again
+         * After `power()` is called
          * Called at least once per 5 min while in passive mode to keep the Rooma awake
-        Some serial/usb cables are wired wrong so this doesn't work, but recent cables are fine.
 
-        This blocks for 0.3 seconds.
+        This blocks for twice the sleep_time which defaults to 0.015 seconds. A longer value may be
+        needed to wake it in certain circumstances.
+        
+        By default this pulses the RTS/DTR pins of the serial port which works for the offical 
+        Create 2 cables (however older ones are wired incorreclty and don't work). In other
+        circumstances a separate signal line is used for the BRC of the Create 2. In these cases
+        you must provide the `brc` function which takes a single argument which will be False or
+        True with `sleep_time` inbetween.
         """
-        self.serial.rts = False
-        self.serial.dtr = False
-        time.sleep(0.15)
-        self.serial.rts = True
-        self.serial.dtr = True
-        time.sleep(0.15)
+        if brc is None:
+            def brc(x): self.serial.rts = self.serial.dtr = x
+        brc(False)
+        time.sleep(sleep_time)
+        brc(True)
+        time.sleep(sleep_time)
 
     @property
     def baud(self): return self.serial.baudrate
