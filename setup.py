@@ -23,7 +23,7 @@ with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "README.md")
 
 setup(
     name='yarc',
-    version='0.9.2',
+    version='0.9.3',
     description='Yet Another Roomba Controller',
     license="GPLv3",
     long_description=long_description,
@@ -32,7 +32,7 @@ setup(
     author_email='jeff@coderforlife.com',
     url="https://github.com/coderforlife/yarc",
     packages=['yarc'],
-    install_requires=['pyserial'],
+    install_requires=['pyserial'] + [['aenum'] if sys.version_info < (3, 6) else []],
     python_requires='>=3.5',
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
